@@ -1,0 +1,243 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Infraestructura como código (Serverless Framework v3) de la API de Alumco.
+#
+#   npm run deploy   → crea o actualiza TODO en AWS: 4 Lambdas, la API HTTP
+#                      (API Gateway), 6 tablas DynamoDB y Cognito.
+#   npm run remove   → lo borra todo.
+#
+# Pensado para el AWS Learner Lab: región us-east-1 y rol LabRole.
+# ─────────────────────────────────────────────────────────────────────────────
+service: alumco
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256 # en Lambda la CPU crece junto con la memoria
+  timeout: 10
+
+  # En el Learner Lab no se pueden crear roles: todas las funciones usan LabRole.
+  # En una cuenta real se daría a cada función solo los permisos de SUS tablas
+  # (mínimo privilegio), con provider.iam.role.statements.
+  iam:
+    role: arn:aws:iam::${aws:accountId}:role/LabRole
+
+  logs:
+    httpApi: true # registro de accesos de la API en CloudWatch
+
+  httpApi:
+    cors: true
+    # API Gateway valida el token de Cognito ANTES de llamar a la Lambda
+    authorizers:
+      cognitoJwt:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl:
+          Fn::Sub:
+            - https://cognito-idp.${AWS::Region}.amazonaws.com/${PoolId}
+            - { PoolId: { Ref: CognitoUserPool } }
+        audience:
+          - { Ref: CognitoUserPoolClient }
+
+  environment:
+    REPOSITORIOS: dynamo
+    TABLA_USUARIOS: { Ref: TablaUsuarios }
+    TABLA_CURSOS: { Ref: TablaCursos }
+    TABLA_EXAMENES: { Ref: TablaExamenes }
+    TABLA_INSCRIPCIONES: { Ref: TablaInscripciones }
+    TABLA_INTENTOS: { Ref: TablaIntentos }
+    TABLA_CERTIFICADOS: { Ref: TablaCertificados }
+    COGNITO_POOL_ID: { Ref: CognitoUserPool }
+    COGNITO_CLIENTE_ID: { Ref: CognitoUserPoolClient }
+    # Chaos Engineering (ver src/compartido/inyectar-fallas.js). En 0 no hacen nada.
+    CHAOS_TASA_FALLAS: '0'
+    CHAOS_LATENCIA_MS: '0'
+    CHAOS_VIDEOS_CAIDOS: 'no'
+
+package:
+  patterns:
+    - '!pruebas/**'
+    - '!local/**'
+    - '!scripts/**'
+    - '!demo/**'
+    - '!.github/**'
+    - '!*.md'
+
+# Una Lambda por módulo de negocio. Cada ruta indica si exige token (authorizer).
+functions:
+  salud:
+    handler: src/salud/handler-salud.handler
+    events:
+      - httpApi: { method: GET, path: /salud }
+
+  usuarios:
+    handler: src/usuarios/handler-usuarios.handler
+    events:
+      - httpApi: { method: POST, path: /auth/login }
+      - httpApi: { method: GET, path: /perfil, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: /admin/usuarios, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: POST, path: /admin/usuarios, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: '/admin/usuarios/{usuarioId}', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: PUT, path: '/admin/usuarios/{usuarioId}/rol', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: PUT, path: '/admin/usuarios/{usuarioId}/estado', authorizer: { name: cognitoJwt } }
+
+  cursos:
+    handler: src/cursos/handler-cursos.handler
+    events:
+      - httpApi: { method: GET, path: /gestion/cursos, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: POST, path: /gestion/cursos, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: '/gestion/cursos/{cursoId}', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: PATCH, path: '/gestion/cursos/{cursoId}', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: DELETE, path: '/gestion/cursos/{cursoId}', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: POST, path: '/gestion/cursos/{cursoId}/modulos', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: PUT, path: '/gestion/cursos/{cursoId}/modulos/{moduloId}', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: DELETE, path: '/gestion/cursos/{cursoId}/modulos/{moduloId}', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: PUT, path: '/gestion/cursos/{cursoId}/examen', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: POST, path: '/gestion/cursos/{cursoId}/publicar', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: POST, path: '/gestion/cursos/{cursoId}/despublicar', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: '/gestion/cursos/{cursoId}/progreso', authorizer: { name: cognitoJwt } }
+
+  alumnos:
+    handler: src/alumnos/handler-alumnos.handler
+    events:
+      - httpApi: { method: GET, path: /catalogo, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: POST, path: /inscripciones, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: /mis-cursos, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: '/cursos/{cursoId}', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: POST, path: '/cursos/{cursoId}/modulos/{moduloId}/completar', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: '/cursos/{cursoId}/examen', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: POST, path: '/cursos/{cursoId}/examen/intentos', authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: /mis-certificados, authorizer: { name: cognitoJwt } }
+      - httpApi: { method: GET, path: '/certificados/{certificadoId}' }
+
+resources:
+  Resources:
+    # ── DynamoDB: pago por uso (on-demand), sin servidores que administrar ──
+    TablaUsuarios:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${sls:stage}-usuarios
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: usuarioId, AttributeType: S }
+          - { AttributeName: correo, AttributeType: S }
+        KeySchema:
+          - { AttributeName: usuarioId, KeyType: HASH }
+        GlobalSecondaryIndexes:
+          - IndexName: porCorreo
+            KeySchema: [{ AttributeName: correo, KeyType: HASH }]
+            Projection: { ProjectionType: ALL }
+
+    TablaCursos:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${sls:stage}-cursos
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: cursoId, AttributeType: S }
+          - { AttributeName: docenteId, AttributeType: S }
+          - { AttributeName: estado, AttributeType: S }
+        KeySchema:
+          - { AttributeName: cursoId, KeyType: HASH }
+        GlobalSecondaryIndexes:
+          - IndexName: porDocente
+            KeySchema: [{ AttributeName: docenteId, KeyType: HASH }]
+            Projection: { ProjectionType: ALL }
+          - IndexName: porEstado
+            KeySchema: [{ AttributeName: estado, KeyType: HASH }]
+            Projection: { ProjectionType: ALL }
+
+    TablaExamenes:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${sls:stage}-examenes
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: cursoId, AttributeType: S }
+        KeySchema:
+          - { AttributeName: cursoId, KeyType: HASH }
+
+    TablaInscripciones:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${sls:stage}-inscripciones
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: alumnoId, AttributeType: S }
+          - { AttributeName: cursoId, AttributeType: S }
+        KeySchema:
+          - { AttributeName: alumnoId, KeyType: HASH }
+          - { AttributeName: cursoId, KeyType: RANGE }
+        GlobalSecondaryIndexes:
+          - IndexName: porCurso
+            KeySchema: [{ AttributeName: cursoId, KeyType: HASH }]
+            Projection: { ProjectionType: ALL }
+
+    TablaIntentos:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${sls:stage}-intentos
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: intentoId, AttributeType: S }
+        KeySchema:
+          - { AttributeName: intentoId, KeyType: HASH }
+
+    TablaCertificados:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-${sls:stage}-certificados
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - { AttributeName: certificadoId, AttributeType: S }
+          - { AttributeName: alumnoId, AttributeType: S }
+        KeySchema:
+          - { AttributeName: certificadoId, KeyType: HASH }
+        GlobalSecondaryIndexes:
+          - IndexName: porAlumno
+            KeySchema: [{ AttributeName: alumnoId, KeyType: HASH }]
+            Projection: { ProjectionType: ALL }
+
+    # ── Cognito: cuentas, contraseñas y tokens (el backend nunca guarda contraseñas) ──
+    CognitoUserPool:
+      Type: AWS::Cognito::UserPool
+      Properties:
+        UserPoolName: ${self:service}-${sls:stage}-usuarios
+        UsernameAttributes: [email]
+        AdminCreateUserConfig:
+          AllowAdminCreateUserOnly: true # no hay registro público: las cuentas las crea el administrador
+        Policies:
+          PasswordPolicy:
+            MinimumLength: 8
+            RequireLowercase: true
+            RequireUppercase: true
+            RequireNumbers: true
+            RequireSymbols: false
+
+    CognitoUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        ClientName: ${self:service}-${sls:stage}-api
+        UserPoolId: { Ref: CognitoUserPool }
+        GenerateSecret: false
+        PreventUserExistenceErrors: ENABLED
+        ExplicitAuthFlows:
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        IdTokenValidity: 60
+        AccessTokenValidity: 60
+        RefreshTokenValidity: 30
+        TokenValidityUnits:
+          IdToken: minutes
+          AccessToken: minutes
+          RefreshToken: days
+
+  Outputs:
+    CognitoPoolId:
+      Value: { Ref: CognitoUserPool }
+    CognitoClienteId:
+      Value: { Ref: CognitoUserPoolClient }
+    TablaUsuarios:
+      Value: { Ref: TablaUsuarios }
