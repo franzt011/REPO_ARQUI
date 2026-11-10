@@ -1,5 +1,5 @@
 const { CircuitBreaker } = require("../compartido/circuit-breaker.js");
-const { retrybackoffJitter } = require("../compartido/retry-backoffexp-jitter.js");
+const { reintentarConEspera  } = require("../compartido/reintentar-con-espera.js");
 
 function esdeYt(url) {
     return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i.test(url);
@@ -25,19 +25,19 @@ async function consultarServiciodeVideo(url) {
 class VerificadorEnlacesVideo {
     constructor({ consultar = consultarServiciodeVideo, circuito, esperar } = {}) {
         this.consultar = consultar;
-        this.circuito = circuito || new CircuitBreaker({ nombre: 'servicio-de-video', limiteFallas: 3, esperaMs: 30000});
+        this.circuito = circuito || new CircuitBreaker({ nombre: 'servicio-de-video', umbralFallas: 3, esperaMs: 30000});
         this.esperar = esperar;
     }
 
     async verificarEnlace(url) {
-        return this.circuito.ejecutar(() => retrybackoffJitter(() => this.consultar(url), { intentos: 2, esperar: this.esperar }), () => 'pendiente',);
+        return this.circuito.ejecutar(() => reintentarConEspera(() => this.consultar(url), { intentos: 2, esperar: this.esperar }), () => 'pendiente',);
     }
 }
 
 let compartido;
-function verificarCompartido() {
+function verificadorCompartido() {
     if (!compartido) compartido = new VerificadorEnlacesVideo();
     return compartido;
 }
 
-module.exports = { VerificadorEnlacesVideo, verificarCompartido, consultarServiciodeVideo };
+module.exports = { VerificadorEnlacesVideo, verificadorCompartido, consultarServiciodeVideo };
