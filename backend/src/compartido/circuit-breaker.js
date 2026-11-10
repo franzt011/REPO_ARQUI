@@ -1,7 +1,7 @@
 class CircuitBreaker {
-    constructor({ nombre = 'circuito', limiteFallas = 3, esperaMs = 3000, ahora = Date.now } = {}) {
+    constructor({ nombre = 'circuito', umbralFallas = 3, esperaMs = 30000, ahora = Date.now } = {}) {
         this.nombre = nombre;
-        this.limiteFallas = limiteFallas;
+        this.umbralFallas = umbralFallas;
         this.esperaMs = esperaMs;
         this.ahora = ahora;
         this.estado = 'cerrado';
@@ -27,9 +27,14 @@ class CircuitBreaker {
         }
     }
 
-    registrarExito() {
+    registrarExito(){
+        this.fallasSeguidas = 0;
+        if (this.estado !== 'cerrado') this.cambiarEstado('cerrado');
+    }
+
+    registrarFalla() {
         this.fallasSeguidas += 1;
-        if (this.estado === 'semiabierto' || this.fallasSeguidas >= this.limiteFallas) {
+        if (this.estado === 'semiabierto' || this.fallasSeguidas >= this.umbralFallas) {
             this.abiertoDesde = this.ahora();
             this.cambiarEstado('abierto');
         }

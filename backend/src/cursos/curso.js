@@ -3,7 +3,7 @@ const {
     ReglaDeNegocioError,
     SinPermisoError,
     esTextoConContenido,
-} = require('.../compartido/errores');
+} = require('../compartido/errores');
 
 const EXIGENCIA_POR_DEFECTO = 60;
 const INTENTOS_POR_DEFECTO = 2;

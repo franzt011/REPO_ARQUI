@@ -1,4 +1,4 @@
-const { ReglaDeNegocioError, esTextoConContenido } = require('.../compartido/errores');
+const { ReglaDeNegocioError, esTextoConContenido } = require('../compartido/errores');
 
 function invalida(mensaje) {
     return new ReglaDeNegocioError('pregunta-invalida', mensaje);
@@ -19,11 +19,11 @@ class Pregunta {
             }
             this.opciones = opciones.map((o) => ({ opcionId: o.opcionId, texto: o.texto, esCorrecta: o.esCorrecta === true}));
         } else if (datos.tipo === 'vf') {
-            if (typeof datos.respuestaVF !== 'boolean') {
+            if (typeof datos.respuestaVf !== 'boolean') {
                 throw invalida('Una pregunta de V/F necesita su respuesta correcta.');
             }
             this.opciones = [];
-            this.respuestaVF = datos.respuestaVF;
+            this.respuestaVf = datos.respuestaVf;
         } else {
             throw invalida(`El tipo de pregunta "${datos.tipo}" no existe. Usa "multiple" o "vf".`);
         }
@@ -36,7 +36,7 @@ class Pregunta {
         if (this.tipo === 'multiple') {
             return this.opciones.some((o) => o.opcionId === respuesta && o.esCorrecta);
         }
-        return (respuesta === 'verdadero') === this.respuestaVF;
+        return (respuesta === 'verdadero') === this.respuestaVf;
     }
 
     datos() {
@@ -45,7 +45,7 @@ class Pregunta {
             tipo: this.tipo,
             texto: this.texto,
             opciones: this.opciones.map((o) => ({ ...o })),
-            respuestaVF: this.respuestaVF,
+            respuestaVf: this.respuestaVf,
         };
     }
 
