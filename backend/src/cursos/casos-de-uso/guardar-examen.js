@@ -15,8 +15,8 @@ async function guardarExamen(d, usuarioId, cursoId, preguntas) {
         preguntas.map((p) => new Pregunta({
             tipo: p.tipo,
             texto: p.texto,
-            respuestasVf: p.respuestasVf,
-            preguntasId: d.ids.nuevo(),
+            respuestaVf: p.respuestaVf,
+            preguntaId: d.ids.nuevo(),
             opciones: (p.opciones || []).map((o) => ({
                 texto:o.texto,
                 esCorrecta:o.esCorrecta,

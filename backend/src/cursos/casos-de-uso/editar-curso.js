@@ -4,7 +4,7 @@ async function editarCurso(d, usuarioId, cursoId, { titulo, descripcion, exigenc
     const usuario = await exigirUsuario(d, usuarioId);
     const curso = await exigirCurso(d, cursoId);
     curso.editar(usuario, { titulo, descripcion, exigenciaMinima, maxIntentos });
-    await d.curso.guardar(curso);
+    await d.cursos.guardar(curso);
     return curso.datos();
 }
 

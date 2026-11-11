@@ -18,7 +18,7 @@ async function guardarModulo(d, usuarioId, cursoId, moduloId, {titulo, contenido
         const yaVerificado = anterior?.linkVideo === modulo.linkVideo && anterior.estadoEnlace === 'verificado';
         const estado = yaVerificado ? 'verificado' : await d.videos.verificarEnlace(modulo.linkVideo);
         if (estado === 'invalido') {
-            throw new ReglaDeNegocioError('enlace-valido', 'El enlace del video no existe o no es publico.');
+            throw new ReglaDeNegocioError('enlace-invalido', 'El enlace del video no existe o no es publico.');
         }
         modulo.estadoEnlace = estado;
     }

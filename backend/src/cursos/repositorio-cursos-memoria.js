@@ -9,7 +9,7 @@ class RepositorioCursosMemoria {
         this.filas.set(curso.cursoId, structuredClone(curso.datos()));
     }
 
-    async buscarporId(cursoId) {
+    async buscarPorId(cursoId) {
         const fila = this.filas.get(cursoId);
         return fila ? Curso.restaurar(structuredClone(fila)) : undefined;
     }

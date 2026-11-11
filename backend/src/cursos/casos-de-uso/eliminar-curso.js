@@ -11,7 +11,7 @@ async function eliminarCurso(d, usuarioId, cursoId) {
         throw new ConflictoError('curso-con-inscritos', 'El curso tiene alumnos inscritos: se despublica en vez de eliminar.');
     }
     await d.cursos.eliminar(cursoId);
-    await d.examenes.elimar(cursoId);
+    await d.examenes.eliminar(cursoId);
 }
 
 module.exports = { eliminarCurso};
