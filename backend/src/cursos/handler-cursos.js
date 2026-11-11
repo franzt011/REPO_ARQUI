@@ -16,7 +16,7 @@ const rutas = {
     'GET /gestion/cursos': async (p, d) => ok(await listarMisCursosDocente(d, p.usuarioId)),
     'POST /gestion/cursos': async (p, d) => creado(await crearCurso(d, p.usuarioId, p.cuerpo)),
     'GET /gestion/cursos/{cursoId}': async (p, d) => ok(await verCursoDocente(d, p.usuarioId, p.params.cursoId)),
-    'PATH /gestion/cursos/{cursoId}': async (p, d) => ok(await editarCurso(d, p.usuarioId, p.params.cursoId, p.cuerpo)),
+    'PATCH /gestion/cursos/{cursoId}': async (p, d) => ok(await editarCurso(d, p.usuarioId, p.params.cursoId, p.cuerpo)),
     'DELETE /gestion/cursos/{cursoId}': async (p, d) => {
         await eliminarCurso(d, p.usuarioId, p.params.cursoId);
         return sinContenido();
