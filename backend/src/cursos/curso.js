@@ -3,7 +3,7 @@ const {
     ReglaDeNegocioError,
     SinPermisoError,
     esTextoConContenido,
-} = require('.../compartido/errores');
+} = require('../compartido/errores');
 
 const EXIGENCIA_POR_DEFECTO = 60;
 const INTENTOS_POR_DEFECTO = 2;
@@ -60,7 +60,7 @@ class Curso {
         this.exigenciaMinima = datos.exigenciaMinima ?? EXIGENCIA_POR_DEFECTO;
         this.maxIntentos = datos.maxIntentos ?? INTENTOS_POR_DEFECTO;
         this.estado = datos.estado || 'borrador';
-        this.modulos = (datos.modulos || []).map((m) => new this.modulos(m));
+        this.modulos = (datos.modulos || []).map((m) => new Modulo(m));
         this.fechaCreacion = datos.fechaCreacion;
     }
 
@@ -130,7 +130,7 @@ class Curso {
         if (!this.tieneModulo(moduloId)) {
             throw new NoEncontradoError('modulo-no-encontrado', `El curso no tiene el módulo ${moduloId}.`);
         }
-        if (this.estado === 'publicado' && this.modulos.lenght === 1) {
+        if (this.estado === 'publicado' && this.modulos.length === 1) {
             throw new ReglaDeNegocioError('curso-incompleto', 'Un curso publicado necesita al menos un módulo.');
         }
         this.modulos = this.modulos.filter((m) => m.moduloId !== moduloId);
@@ -138,7 +138,7 @@ class Curso {
 
     publicar(solicitante, cantidadPreguntas) {
         this.exigirPuedeGestionar(solicitante);
-        if (this.modulos.lenght === 0) {
+        if (this.modulos.length === 0) {
             throw new ReglaDeNegocioError('curso-incompleto', 'El curso necesita al menos un módulo.');
         }
         if (cantidadPreguntas === 0) {
